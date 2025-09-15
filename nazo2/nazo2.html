@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>画像クイズ</title>
+    <!-- Tailwind CSSを読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+    <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md text-center relative">
+        <!-- ヒントボタン -->
+        <button id="hint-button" class="absolute top-4 right-4 bg-gray-200 text-gray-600 h-8 px-3 rounded-full flex items-center justify-center gap-1.5 hover:bg-gray-300 transition duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            <span class="font-medium">ヒント</span>
+        </button>
+
+        <!-- 中央に設置する画像 -->
+        <!-- ここの src="..." を好きな画像のURLに変更してください -->
+        <img id="quiz-image" src="nazo2.jpg" alt="クイズ画像" class="mx-auto mb-6 rounded-lg w-full object-cover">
+
+        <h2 class="text-xl font-semibold text-gray-700 mb-4">❓❓に入る平仮名はー？</h2>
+
+        <!-- 入力フォームと回答ボタン -->
+        <div class="flex justify-center items-center gap-2">
+            <input type="text" id="answer-input" placeholder="答えを入力" class="border-2 border-gray-300 rounded-lg px-4 py-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition duration-200">
+            <button id="submit-button" class="bg-blue-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-600 transition duration-200 whitespace-nowrap">回答</button>
+        </div>
+
+        <!-- 結果表示エリア -->
+        <p id="result-message" class="mt-4 text-lg font-bold h-6"></p>
+    </div>
+
+    <!-- ヒント用モーダルウィンドウ -->
+    <!-- 修正点: 初期状態を 'opacity-0' と 'pointer-events-none' で制御します -->
+    <div id="hint-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <!-- 修正点: 初期状態の大きさを 'scale-95' で制御します -->
+        <div id="hint-modal-content" class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-sm relative transform transition-all duration-300 scale-95">
+            <button id="close-modal-button" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+            <h3 class="text-lg font-bold mb-4">ヒント</h3>
+            <!-- ここにヒントの文章を記入してください -->
+            <p id="hint-text" class="text-gray-600">数字</p>
+        </div>
+    </div>
+
+
+    <script>
+        // DOM要素を取得
+        const answerInput = document.getElementById('answer-input');
+        const submitButton = document.getElementById('submit-button');
+        const resultMessage = document.getElementById('result-message');
+        const hintButton = document.getElementById('hint-button');
+        const hintModal = document.getElementById('hint-modal');
+        const closeModalButton = document.getElementById('close-modal-button');
+        const hintModalContent = document.getElementById('hint-modal-content');
+
+        // 正解の文字列を設定します。この文字列を変更してください。
+        const correctAnswer = "いご";
+
+        // ボタンがクリックされたときの処理
+        submitButton.addEventListener('click', () => {
+            const userAnswer = answerInput.value.trim();
+
+            if (userAnswer === "") {
+                resultMessage.textContent = "なんかいうた？";
+                resultMessage.className = 'mt-4 text-lg font-bold h-6 text-yellow-500';
+                return;
+            }
+
+            if (userAnswer === correctAnswer) {
+                resultMessage.textContent = "正解！";
+                resultMessage.className = 'mt-4 text-lg font-bold h-6 text-green-500';
+            } else {
+                resultMessage.textContent = "ちゃいます～";
+                resultMessage.className = 'mt-4 text-lg font-bold h-6 text-red-500';
+            }
+        });
+
+        // Enterキーでも回答できるようにする
+        answerInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                submitButton.click();
+            }
+        });
+
+        // --- ヒントモーダルの処理 (修正済み) ---
+        
+        // モーダルを開く関数
+        const openModal = () => {
+            // 背景を可視化し、操作可能にする
+            hintModal.classList.remove('opacity-0');
+            hintModal.classList.remove('pointer-events-none');
+            // コンテンツを元の大きさに戻す
+            hintModalContent.classList.remove('scale-95');
+            hintModalContent.classList.add('scale-100');
+        };
+
+        // モーダルを閉じる関数
+        const closeModal = () => {
+            // 背景を不可視化し、操作不能にする
+            hintModal.classList.add('opacity-0');
+            hintModal.classList.add('pointer-events-none');
+            // コンテンツを少し小さくする
+            hintModalContent.classList.remove('scale-100');
+            hintModalContent.classList.add('scale-95');
+        };
+
+        // ヒントボタンを押したらモーダルを表示
+        hintButton.addEventListener('click', openModal);
+        
+        // 閉じるボタンを押したらモーダルを非表示
+        closeModalButton.addEventListener('click', closeModal);
+
+        // モーダルの外側をクリックしたらモーダルを非表示
+        hintModal.addEventListener('click', (event) => {
+            // クリックされた場所が背景自体（hintModal）の場合のみ閉じる
+            if (event.target === hintModal) {
+                closeModal();
+            }
+        });
+    </script>
+
+</body>
+</html>
+
+
+
