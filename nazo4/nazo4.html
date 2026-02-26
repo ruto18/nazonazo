@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>なっぞ4</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .canvas-area {
+            position: relative;
+            width: 100%;
+            height: 320px;
+            background-color: #ffffff;
+            border: 2px solid #f1f5f9;
+            border-radius: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.03);
+            overflow: hidden;
+        }
+
+        .shape-layer {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* レイヤーごとの重なり順 */
+        .layer-index-0 { z-index: 10; }
+        .layer-index-1 { z-index: 20; }
+        .layer-index-2 { z-index: 30; }
+        .layer-index-3 { z-index: 40; }
+
+        /* 判定オーバーレイの重なり順を一番上に */
+        #result-box {
+            z-index: 100;
+            backdrop-filter: blur(4px);
+        }
+
+        .shape-btn {
+            @apply bg-white border-2 border-slate-100 rounded-2xl p-4 shadow-sm transition-all flex items-center justify-center;
+            aspect-ratio: 1 / 1;
+        }
+
+        .shape-btn:active {
+            @apply scale-90 opacity-70;
+        }
+
+        .shape-btn.used {
+            @apply opacity-20 pointer-events-none grayscale;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .result-animate {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen p-4 flex items-center justify-center font-sans text-slate-800">
+
+    <div class="max-w-md w-full space-y-4">
+        <!-- 上の枠: クイズ画像 -->
+        <div class="space-y-1">
+            <div class="bg-white p-2 rounded-3xl border-2 border-slate-200 shadow-sm overflow-hidden flex items-center justify-center aspect-video">
+                <img src="nazo4.jpg" 
+                     alt="Puzzle Question" 
+                     class="max-w-full max-h-full object-contain">
+            </div>
+        </div>
+
+        <!-- 下の枠: 解答エリア -->
+        <div class="space-y-1">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-center">解答キャンバス</p>
+            <div id="canvas" class="canvas-area border-dashed border-2 border-slate-300">
+                <div id="hint-text" class="text-slate-300 text-xs font-bold text-center">
+                    正しい順に4つ選んでください
+                </div>
+
+                <!-- 結果表示オーバーレイ (キャンバスの中に配置) -->
+                <div id="result-box" class="hidden absolute inset-0 flex items-center justify-center p-6 result-animate">
+                    <div id="result-container" class="w-full max-w-[240px] p-6 rounded-[2rem] border-2 flex flex-col items-center gap-4 shadow-xl bg-white/90 backdrop-blur-md">
+                        <p id="result-text" class="font-bold text-lg text-center leading-tight"></p>
+                        <button onclick="resetPuzzle()" class="w-full py-2 px-4 text-[10px] font-black bg-slate-900 text-white rounded-xl transition-all hover:bg-slate-700 uppercase tracking-widest active:scale-95">
+                            もう一度やり直す
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- コントロールパネル -->
+        <div class="bg-white p-5 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 space-y-5">
+            <!-- 6つのボタンを配置するグリッド -->
+            <div id="button-grid" class="grid grid-cols-3 gap-3">
+                <!-- JavaScriptでランダムに生成 -->
+            </div>
+
+            <!-- アクション -->
+            <div class="space-y-3 pt-1">
+                <button onclick="checkResult()" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm hover:bg-slate-800 transition-all shadow-lg active:scale-95">
+                    回答する
+                </button>
+                <button onclick="resetPuzzle()" class="w-full py-1 text-[10px] font-bold text-slate-400 hover:text-rose-500 transition-colors uppercase tracking-widest">
+                    選択をリセット
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const hintText = document.getElementById('hint-text');
+        const resultBox = document.getElementById('result-box');
+        const resultContainer = document.getElementById('result-container');
+        const resultText = document.getElementById('result-text');
+        const buttonGrid = document.getElementById('button-grid');
+
+        let selectionOrder = [];
+        
+        // 【更新】正解: 十字(cross) → 四角(square) → 円(circle) → 三角(triangle)
+        const correctSequence = ['cross', 'square', 'circle', 'triangle'];
+        const scaleStep = [85, 55, 30, 15];
+
+        // 使用する図形の定義
+        const shapeData = [
+            { id: 'circle', color: 'stroke-blue-600', svg: '<circle cx="50" cy="50" r="42" />' },
+            { id: 'cross', color: 'stroke-red-600', svg: '<path d="M50 10 V90 M10 50 H90" />' },
+            { id: 'triangle', color: 'stroke-green-600', svg: '<path d="M50 12 L88 85 H12 Z" />' },
+            { id: 'square', color: 'stroke-purple-600', svg: '<rect x="15" y="15" width="70" height="70" />' },
+            { id: 'rhombus', color: 'stroke-orange-500', svg: '<path d="M50 10 L90 50 L50 90 L10 50 Z" />' },
+            { id: 'xmark', color: 'stroke-slate-600', svg: '<path d="M20 20 L80 80 M80 20 L20 80" />' }
+        ];
+
+        // ボタンをシャッフルして描画
+        function renderButtons() {
+            const shuffled = [...shapeData].sort(() => Math.random() - 0.5);
+            buttonGrid.innerHTML = '';
+            shuffled.forEach(shape => {
+                const btn = document.createElement('button');
+                btn.id = `btn-${shape.id}`;
+                btn.className = `shape-btn hover:border-slate-300`;
+                btn.onclick = () => addShape(shape.id);
+                btn.innerHTML = `<svg viewBox="0 0 100 100" class="fill-none ${shape.color} stroke-[8]">${shape.svg}</svg>`;
+                buttonGrid.appendChild(btn);
+            });
+        }
+
+        function addShape(id) {
+            if (selectionOrder.length >= 4) return;
+            if (!resultBox.classList.contains('hidden')) return; // 判定中は追加不可
+            
+            hintText.classList.add('hidden');
+            const btn = document.getElementById(`btn-${id}`);
+            if(btn) btn.classList.add('used');
+
+            const currentSize = scaleStep[selectionOrder.length];
+            const shapeInfo = shapeData.find(s => s.id === id);
+
+            const layer = document.createElement('div');
+            layer.className = `shape-layer layer-index-${selectionOrder.length}`;
+            layer.style.width = `${currentSize}%`;
+            layer.style.height = `${currentSize}%`;
+            layer.innerHTML = `<svg viewBox="0 0 100 100" class="fill-none ${shapeInfo.color} stroke-[7]">${shapeInfo.svg}</svg>`;
+            
+            canvas.appendChild(layer);
+            selectionOrder.push(id);
+        }
+
+        function checkResult() {
+            if (selectionOrder.length < 4) {
+                alert("図形を4つ選んでください");
+                return;
+            }
+
+            const isCorrect = selectionOrder.every((val, index) => val === correctSequence[index]);
+
+            if (isCorrect) {
+                showFeedback("せせせせせせせせせせせせせせせせせせせせせせせせせせせせせせせせせせ！", "text-green-600 border-green-200 bg-green-50/90");
+            } else {
+                showFeedback("ばばばばばばばばばばばばばばばばばばばばばばばばばばばばばばば！ﾊﾞｯﾃﾝ", "text-rose-600 border-rose-200 bg-rose-50/90");
+            }
+        }
+
+        function showFeedback(msg, cssClasses) {
+            resultBox.classList.remove('hidden');
+            resultBox.classList.add('flex');
+            resultContainer.className = `w-full max-w-[240px] p-6 rounded-[2rem] flex flex-col items-center gap-4 shadow-xl backdrop-blur-md border-2 ${cssClasses}`;
+            resultText.innerText = msg;
+        }
+
+        function resetPuzzle() {
+            selectionOrder = [];
+            const layers = canvas.querySelectorAll('.shape-layer');
+            layers.forEach(l => l.remove());
+            
+            hintText.classList.remove('hidden');
+            resultBox.classList.add('hidden');
+            resultBox.classList.remove('flex');
+            
+            renderButtons();
+        }
+
+        // 初期化
+        renderButtons();
+    </script>
+</body>
+</html>
